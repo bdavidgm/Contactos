@@ -7,6 +7,7 @@ import com.bdavidgm.contactos.data.local.ContactEntity
 import com.bdavidgm.contactos.data.vcf.VcfContact
 import com.bdavidgm.contactos.data.vcf.VcfExporter
 import com.bdavidgm.contactos.data.vcf.VcfParser
+import com.bdavidgm.contactos.phone.PhoneCountries
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -105,6 +106,7 @@ class ContactRepository(
         firstName = firstName,
         lastName = lastName,
         company = company,
+        mobileDialCode = PhoneCountries.DEFAULT_DIAL_CODE,
         mobilePhone = mobilePhone,
         landlinePhone = landlinePhone,
         notes = notes,

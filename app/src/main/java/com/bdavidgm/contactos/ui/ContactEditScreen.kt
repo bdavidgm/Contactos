@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,14 +14,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,9 +37,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -43,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.bdavidgm.contactos.data.repo.ContactRepository
+import com.bdavidgm.contactos.phone.PhoneCountries
 import com.bdavidgm.contactos.viewmodels.ContactEditViewModel
 import com.bdavidgm.contactos.viewmodels.ContactEditViewModelFactory
 import kotlinx.coroutines.launch
@@ -50,6 +62,92 @@ import java.io.File
 
 private val TopBarCeleste = Color(0xFF87CEEB)
 private val TopBarOnCeleste = Color(0xFF0A3D5C)
+
+@Composable
+private fun MobilePhoneCountryRow(
+    dialCodeDigits: String,
+    nationalNumber: String,
+    onDialCodeChange: (String) -> Unit,
+    onNationalChange: (String) -> Unit,
+) {
+    val normalizedDial = remember(dialCodeDigits) {
+        dialCodeDigits.filter { it.isDigit() }.ifEmpty { PhoneCountries.DEFAULT_DIAL_CODE }
+    }
+    val options = remember(normalizedDial) {
+        PhoneCountries.optionsForStoredDialCode(normalizedDial)
+    }
+    val displayCode = remember(normalizedDial) { "+$normalizedDial" }
+    var expanded by remember { mutableStateOf(false) }
+
+    val textMeasurer = rememberTextMeasurer()
+    val bodySmall = MaterialTheme.typography.bodySmall
+    val density = LocalDensity.current
+    val countryColumnWidth = remember(textMeasurer, bodySmall, density) {
+        val textWidthPx = textMeasurer.measure(
+            text = AnnotatedString("+888"),
+            style = bodySmall,
+        ).size.width
+        with(density) {
+            (textWidthPx.toDp() + 36.dp) * 2f * 0.8f
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        // Ancho: 80 % del doble de la medida de "+888" + icono (antes 100 %).
+        Box(modifier = Modifier.width(countryColumnWidth)) {
+            OutlinedTextField(
+                value = displayCode,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall,
+                label = {
+                    Text("País", style = MaterialTheme.typography.labelSmall)
+                },
+                trailingIcon = {
+                    IconButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowDropDown,
+                            contentDescription = "Elegir país",
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                options.forEach { country ->
+                    DropdownMenuItem(
+                        text = { Text(country.label) },
+                        onClick = {
+                            onDialCodeChange(country.dialCodeDigits)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = nationalNumber,
+            onValueChange = onNationalChange,
+            label = { Text("Teléfono móvil") },
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            singleLine = true,
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,10 +208,15 @@ fun ContactEditScreen(
         return
     }
 
+    val screenTitle =
+        if (contactId == 0L) "Agregar contacto" else "Contacto"
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { },
+                title = {
+                    Text(screenTitle, color = TopBarOnCeleste)
+                },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
                         Icon(
@@ -221,12 +324,11 @@ fun ContactEditScreen(
                 singleLine = true,
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = ui.mobilePhone,
-                onValueChange = vm::updateMobile,
-                label = { Text("Teléfono móvil") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+            MobilePhoneCountryRow(
+                dialCodeDigits = ui.mobileDialCode,
+                nationalNumber = ui.mobilePhone,
+                onDialCodeChange = vm::updateMobileDialCode,
+                onNationalChange = vm::updateMobile,
             )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(

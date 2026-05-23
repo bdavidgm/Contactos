@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.bdavidgm.contactos.data.local.ContactEntity
 import com.bdavidgm.contactos.data.repo.ContactRepository
+import com.bdavidgm.contactos.phone.PhoneCountries
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,7 @@ data class ContactEditUiState(
     val firstName: String = "",
     val lastName: String = "",
     val company: String = "",
+    val mobileDialCode: String = PhoneCountries.DEFAULT_DIAL_CODE,
     val mobilePhone: String = "",
     val landlinePhone: String = "",
     val notes: String = "",
@@ -62,6 +64,7 @@ class ContactEditViewModel(
                         firstName = c.firstName,
                         lastName = c.lastName,
                         company = c.company,
+                        mobileDialCode = c.mobileDialCode.trim().ifBlank { PhoneCountries.DEFAULT_DIAL_CODE },
                         mobilePhone = c.mobilePhone,
                         landlinePhone = c.landlinePhone,
                         notes = c.notes,
@@ -82,6 +85,11 @@ class ContactEditViewModel(
     fun updateFirstName(v: String) = _ui.update { it.copy(firstName = v) }
     fun updateLastName(v: String) = _ui.update { it.copy(lastName = v) }
     fun updateCompany(v: String) = _ui.update { it.copy(company = v) }
+    fun updateMobileDialCode(code: String) {
+        val digits = code.filter { it.isDigit() }.ifEmpty { PhoneCountries.DEFAULT_DIAL_CODE }
+        _ui.update { it.copy(mobileDialCode = digits) }
+    }
+
     fun updateMobile(v: String) = _ui.update { it.copy(mobilePhone = v) }
     fun updateLandline(v: String) = _ui.update { it.copy(landlinePhone = v) }
     fun updateNotes(v: String) = _ui.update { it.copy(notes = v) }
@@ -129,6 +137,8 @@ class ContactEditViewModel(
                 firstName = s.firstName.trim(),
                 lastName = s.lastName.trim(),
                 company = s.company.trim(),
+                mobileDialCode = s.mobileDialCode.trim().filter { it.isDigit() }
+                    .ifEmpty { PhoneCountries.DEFAULT_DIAL_CODE },
                 mobilePhone = s.mobilePhone.trim(),
                 landlinePhone = s.landlinePhone.trim(),
                 notes = s.notes.trim(),

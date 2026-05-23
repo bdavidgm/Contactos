@@ -2,6 +2,7 @@ package com.bdavidgm.contactos.data.vcf
 
 import android.util.Base64
 import com.bdavidgm.contactos.data.local.ContactEntity
+import com.bdavidgm.contactos.phone.buildMobileE164Digits
 import java.io.File
 import java.util.Locale
 
@@ -23,7 +24,9 @@ object VcfExporter {
                 appendLine("ORG:${escapeSemi(c.company)}")
             }
             if (c.mobilePhone.isNotBlank()) {
-                appendLine("TEL;CELL;PREF:${escapeText(c.mobilePhone)}")
+                val e164 = buildMobileE164Digits(c.mobileDialCode, c.mobilePhone)
+                val cell = e164?.let { "+$it" } ?: c.mobilePhone
+                appendLine("TEL;CELL;PREF:${escapeText(cell)}")
             }
             if (c.landlinePhone.isNotBlank()) {
                 appendLine("TEL;HOME:${escapeText(c.landlinePhone)}")

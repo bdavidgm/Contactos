@@ -12,6 +12,9 @@ data class ContactListRowUi(
     val initials: String,
     val photoPath: String?,
     val showPhoto: Boolean,
+    val mobileDialCode: String,
+    val mobilePhone: String,
+    val landlinePhone: String,
 )
 
 object ContactListRowFormatter {
@@ -25,6 +28,9 @@ object ContactListRowFormatter {
             initials = contactInitials(contact),
             photoPath = if (showPhoto) path else null,
             showPhoto = showPhoto,
+            mobileDialCode = contact.mobileDialCode,
+            mobilePhone = contact.mobilePhone,
+            landlinePhone = contact.landlinePhone,
         )
     }
 

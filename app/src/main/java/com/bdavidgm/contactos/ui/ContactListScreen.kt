@@ -1,5 +1,9 @@
 package com.bdavidgm.contactos.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -38,7 +42,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.bdavidgm.contactos.ContactosApplication
 import com.bdavidgm.contactos.data.repo.ContactRepository
+import com.bdavidgm.contactos.phone.buildMobileE164Digits
 import com.bdavidgm.contactos.viewmodels.ContactListViewModel
 import com.bdavidgm.contactos.viewmodels.ContactListViewModelFactory
 import java.io.File
@@ -194,47 +201,156 @@ private fun ContactRow(
     row: ContactListRowUi,
     onClick: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var rowMenuExpanded by remember(row.contactId) { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            modifier = Modifier.size(44.dp),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (row.showPhoto && row.photoPath != null) {
-                AsyncImage(
-                    model = File(row.photoPath),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(TopBarCeleste.copy(alpha = 0.55f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = row.initials,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TopBarOnCeleste,
+            Box(
+                modifier = Modifier.size(44.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (row.showPhoto && row.photoPath != null) {
+                    AsyncImage(
+                        model = File(row.photoPath),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(TopBarCeleste.copy(alpha = 0.55f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = row.initials,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TopBarOnCeleste,
+                        )
+                    }
                 }
             }
+            Text(
+                text = row.displayName,
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
-        Text(
-            text = row.displayName,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.weight(1f),
-        )
+        Box {
+            IconButton(
+                onClick = { rowMenuExpanded = true },
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = "Opciones del contacto",
+                    tint = TopBarOnCeleste,
+                )
+            }
+            DropdownMenu(
+                expanded = rowMenuExpanded,
+                onDismissRequest = { rowMenuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("SMS") },
+                    onClick = {
+                        rowMenuExpanded = false
+                        openSmsToContact(context, row)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Llamada") },
+                    onClick = {
+                        rowMenuExpanded = false
+                        openDialContact(context, row)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("WhatsApp") },
+                    onClick = {
+                        rowMenuExpanded = false
+                        openWhatsAppChat(context, row)
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun digitsOnly(phone: String): String = phone.filter { it.isDigit() }
+
+private fun primaryPhoneDigits(row: ContactListRowUi): String? {
+    val mobile = buildMobileE164Digits(row.mobileDialCode, row.mobilePhone)
+    if (!mobile.isNullOrBlank()) return mobile
+    val l = digitsOnly(row.landlinePhone)
+    if (l.isNotBlank()) return l
+    return null
+}
+
+private fun toastNoNumber(context: Context) {
+    Toast.makeText(context, "Este contacto no tiene número", Toast.LENGTH_SHORT).show()
+}
+
+private fun openSmsToContact(context: Context, row: ContactListRowUi) {
+    val d = primaryPhoneDigits(row) ?: return toastNoNumber(context)
+    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$d"))
+    try {
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        Toast.makeText(context, "No se pudo abrir la app de mensajes", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun openDialContact(context: Context, row: ContactListRowUi) {
+    val d = primaryPhoneDigits(row) ?: return toastNoNumber(context)
+    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(d)}"))
+    try {
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        Toast.makeText(context, "No se pudo abrir el marcador", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * E.164 sin `+` para WhatsApp: móvil con código de país del contacto;
+ * si solo hay fijo, dígitos del fijo sin ceros iniciales de más.
+ */
+private fun digitsForWhatsApp(row: ContactListRowUi): String? {
+    val mobile = buildMobileE164Digits(row.mobileDialCode, row.mobilePhone)
+    if (!mobile.isNullOrBlank()) return mobile
+    val land = digitsOnly(row.landlinePhone)
+    if (land.isBlank()) return null
+    var s = land
+    while (s.startsWith('0') && s.length > 1) s = s.substring(1)
+    return s
+}
+
+private fun openWhatsAppChat(context: Context, row: ContactListRowUi) {
+    val phone = digitsForWhatsApp(row) ?: return toastNoNumber(context)
+    if (phone.isBlank()) return toastNoNumber(context)
+    // `?phone=` evita ambigüedades con ceros iniciales en el segmento de ruta de wa.me
+    val uri = Uri.parse("https://api.whatsapp.com/send").buildUpon()
+        .appendQueryParameter("phone", phone)
+        .build()
+    val intent = Intent(Intent.ACTION_VIEW, uri)
+    try {
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        Toast.makeText(context, "No se pudo abrir WhatsApp", Toast.LENGTH_SHORT).show()
     }
 }

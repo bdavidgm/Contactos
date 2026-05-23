@@ -9,6 +9,9 @@ data class ContactEntity(
     val firstName: String = "",
     val lastName: String = "",
     val company: String = "",
+    /** Código de país solo dígitos (p. ej. 53, 34), sin +. */
+    val mobileDialCode: String = "53",
+    /** Número móvil nacional (sin prefijo de país). */
     val mobilePhone: String = "",
     val landlinePhone: String = "",
     val notes: String = "",
