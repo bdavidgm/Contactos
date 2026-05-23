@@ -29,7 +29,9 @@ object VcfExporter {
                 appendLine("TEL;CELL;PREF:${escapeText(cell)}")
             }
             if (c.landlinePhone.isNotBlank()) {
-                appendLine("TEL;HOME:${escapeText(c.landlinePhone)}")
+                val e164Home = buildMobileE164Digits(c.landlineDialCode, c.landlinePhone)
+                val home = e164Home?.let { "+$it" } ?: c.landlinePhone
+                appendLine("TEL;HOME:${escapeText(home)}")
             }
             if (c.email.isNotBlank()) {
                 appendLine("EMAIL;INTERNET:${escapeText(c.email)}")

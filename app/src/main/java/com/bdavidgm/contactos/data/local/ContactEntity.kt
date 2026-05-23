@@ -13,6 +13,9 @@ data class ContactEntity(
     val mobileDialCode: String = "53",
     /** Número móvil nacional (sin prefijo de país). */
     val mobilePhone: String = "",
+    /** Código de país del fijo, solo dígitos (p. ej. 53), sin +. */
+    val landlineDialCode: String = "53",
+    /** Número fijo nacional (sin prefijo de país). */
     val landlinePhone: String = "",
     val notes: String = "",
     val email: String = "",

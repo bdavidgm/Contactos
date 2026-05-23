@@ -108,6 +108,7 @@ class ContactRepository(
         company = company,
         mobileDialCode = PhoneCountries.DEFAULT_DIAL_CODE,
         mobilePhone = mobilePhone,
+        landlineDialCode = PhoneCountries.DEFAULT_DIAL_CODE,
         landlinePhone = landlinePhone,
         notes = notes,
         email = email,

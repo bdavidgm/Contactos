@@ -292,13 +292,11 @@ private fun ContactRow(
     }
 }
 
-private fun digitsOnly(phone: String): String = phone.filter { it.isDigit() }
-
 private fun primaryPhoneDigits(row: ContactListRowUi): String? {
     val mobile = buildMobileE164Digits(row.mobileDialCode, row.mobilePhone)
     if (!mobile.isNullOrBlank()) return mobile
-    val l = digitsOnly(row.landlinePhone)
-    if (l.isNotBlank()) return l
+    val land = buildMobileE164Digits(row.landlineDialCode, row.landlinePhone)
+    if (!land.isNullOrBlank()) return land
     return null
 }
 
@@ -327,17 +325,12 @@ private fun openDialContact(context: Context, row: ContactListRowUi) {
 }
 
 /**
- * E.164 sin `+` para WhatsApp: móvil con código de país del contacto;
- * si solo hay fijo, dígitos del fijo sin ceros iniciales de más.
+ * E.164 sin `+` para WhatsApp: móvil o fijo con código de país del contacto.
  */
 private fun digitsForWhatsApp(row: ContactListRowUi): String? {
     val mobile = buildMobileE164Digits(row.mobileDialCode, row.mobilePhone)
     if (!mobile.isNullOrBlank()) return mobile
-    val land = digitsOnly(row.landlinePhone)
-    if (land.isBlank()) return null
-    var s = land
-    while (s.startsWith('0') && s.length > 1) s = s.substring(1)
-    return s
+    return buildMobileE164Digits(row.landlineDialCode, row.landlinePhone)
 }
 
 private fun openWhatsAppChat(context: Context, row: ContactListRowUi) {

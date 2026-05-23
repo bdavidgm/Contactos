@@ -14,6 +14,7 @@ data class ContactListRowUi(
     val showPhoto: Boolean,
     val mobileDialCode: String,
     val mobilePhone: String,
+    val landlineDialCode: String,
     val landlinePhone: String,
 )
 
@@ -30,6 +31,7 @@ object ContactListRowFormatter {
             showPhoto = showPhoto,
             mobileDialCode = contact.mobileDialCode,
             mobilePhone = contact.mobilePhone,
+            landlineDialCode = contact.landlineDialCode,
             landlinePhone = contact.landlinePhone,
         )
     }

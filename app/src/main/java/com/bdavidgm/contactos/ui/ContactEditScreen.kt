@@ -49,6 +49,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -64,7 +65,28 @@ private val TopBarCeleste = Color(0xFF87CEEB)
 private val TopBarOnCeleste = Color(0xFF0A3D5C)
 
 @Composable
-private fun MobilePhoneCountryRow(
+private fun rememberCountrySelectorColumnWidth(): Dp {
+    val textMeasurer = rememberTextMeasurer()
+    val bodySmall = MaterialTheme.typography.bodySmall
+    val density = LocalDensity.current
+    return remember(textMeasurer, bodySmall, density) {
+        val textWidthPx = textMeasurer.measure(
+            text = AnnotatedString("+888"),
+            style = bodySmall,
+        ).size.width
+        with(density) {
+            (textWidthPx.toDp() + 36.dp) * 2f * 0.8f
+        }
+    }
+}
+
+/**
+ * Misma proporción para móvil y fijo: ancho del país medido con [rememberCountrySelectorColumnWidth],
+ * número nacional con [Modifier.weight] (1f).
+ */
+@Composable
+private fun DialCodeNationalPhoneRow(
+    nationalPhoneLabel: String,
     dialCodeDigits: String,
     nationalNumber: String,
     onDialCodeChange: (String) -> Unit,
@@ -79,25 +101,13 @@ private fun MobilePhoneCountryRow(
     val displayCode = remember(normalizedDial) { "+$normalizedDial" }
     var expanded by remember { mutableStateOf(false) }
 
-    val textMeasurer = rememberTextMeasurer()
-    val bodySmall = MaterialTheme.typography.bodySmall
-    val density = LocalDensity.current
-    val countryColumnWidth = remember(textMeasurer, bodySmall, density) {
-        val textWidthPx = textMeasurer.measure(
-            text = AnnotatedString("+888"),
-            style = bodySmall,
-        ).size.width
-        with(density) {
-            (textWidthPx.toDp() + 36.dp) * 2f * 0.8f
-        }
-    }
+    val countryColumnWidth = rememberCountrySelectorColumnWidth()
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        // Ancho: 80 % del doble de la medida de "+888" + icono (antes 100 %).
         Box(modifier = Modifier.width(countryColumnWidth)) {
             OutlinedTextField(
                 value = displayCode,
@@ -140,7 +150,7 @@ private fun MobilePhoneCountryRow(
         OutlinedTextField(
             value = nationalNumber,
             onValueChange = onNationalChange,
-            label = { Text("Teléfono móvil") },
+            label = { Text(nationalPhoneLabel) },
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -324,19 +334,20 @@ fun ContactEditScreen(
                 singleLine = true,
             )
             Spacer(Modifier.height(8.dp))
-            MobilePhoneCountryRow(
+            DialCodeNationalPhoneRow(
+                nationalPhoneLabel = "Teléfono móvil",
                 dialCodeDigits = ui.mobileDialCode,
                 nationalNumber = ui.mobilePhone,
                 onDialCodeChange = vm::updateMobileDialCode,
                 onNationalChange = vm::updateMobile,
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = ui.landlinePhone,
-                onValueChange = vm::updateLandline,
-                label = { Text("Teléfono fijo") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+            DialCodeNationalPhoneRow(
+                nationalPhoneLabel = "Teléfono fijo",
+                dialCodeDigits = ui.landlineDialCode,
+                nationalNumber = ui.landlinePhone,
+                onDialCodeChange = vm::updateLandlineDialCode,
+                onNationalChange = vm::updateLandline,
             )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(

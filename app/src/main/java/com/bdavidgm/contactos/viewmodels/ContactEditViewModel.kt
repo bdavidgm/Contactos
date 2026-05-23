@@ -27,6 +27,7 @@ data class ContactEditUiState(
     val company: String = "",
     val mobileDialCode: String = PhoneCountries.DEFAULT_DIAL_CODE,
     val mobilePhone: String = "",
+    val landlineDialCode: String = PhoneCountries.DEFAULT_DIAL_CODE,
     val landlinePhone: String = "",
     val notes: String = "",
     val email: String = "",
@@ -66,6 +67,7 @@ class ContactEditViewModel(
                         company = c.company,
                         mobileDialCode = c.mobileDialCode.trim().ifBlank { PhoneCountries.DEFAULT_DIAL_CODE },
                         mobilePhone = c.mobilePhone,
+                        landlineDialCode = c.landlineDialCode.trim().ifBlank { PhoneCountries.DEFAULT_DIAL_CODE },
                         landlinePhone = c.landlinePhone,
                         notes = c.notes,
                         email = c.email,
@@ -91,6 +93,11 @@ class ContactEditViewModel(
     }
 
     fun updateMobile(v: String) = _ui.update { it.copy(mobilePhone = v) }
+    fun updateLandlineDialCode(code: String) {
+        val digits = code.filter { it.isDigit() }.ifEmpty { PhoneCountries.DEFAULT_DIAL_CODE }
+        _ui.update { it.copy(landlineDialCode = digits) }
+    }
+
     fun updateLandline(v: String) = _ui.update { it.copy(landlinePhone = v) }
     fun updateNotes(v: String) = _ui.update { it.copy(notes = v) }
     fun updateEmail(v: String) = _ui.update { it.copy(email = v) }
@@ -140,6 +147,8 @@ class ContactEditViewModel(
                 mobileDialCode = s.mobileDialCode.trim().filter { it.isDigit() }
                     .ifEmpty { PhoneCountries.DEFAULT_DIAL_CODE },
                 mobilePhone = s.mobilePhone.trim(),
+                landlineDialCode = s.landlineDialCode.trim().filter { it.isDigit() }
+                    .ifEmpty { PhoneCountries.DEFAULT_DIAL_CODE },
                 landlinePhone = s.landlinePhone.trim(),
                 notes = s.notes.trim(),
                 email = s.email.trim(),
