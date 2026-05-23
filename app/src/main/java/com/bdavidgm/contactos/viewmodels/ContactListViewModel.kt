@@ -67,6 +67,15 @@ class ContactListViewModel(
         _snackbarMessage.value = null
     }
 
+    fun deleteContact(id: Long) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { repository.deleteContact(id) }
+            }
+            _snackbarMessage.value = "Contacto eliminado"
+        }
+    }
+
     fun onImportDocumentPicked(uri: Uri?) {
         if (uri == null) return
         viewModelScope.launch {

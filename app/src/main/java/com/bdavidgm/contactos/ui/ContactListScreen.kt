@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +38,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -84,6 +86,7 @@ fun ContactListScreen(
     val snackbarMessage by vm.snackbarMessage.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var deleteConfirmRow by remember { mutableStateOf<ContactListRowUi?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/x-vcard"),
@@ -105,6 +108,31 @@ fun ContactListScreen(
         val msg = snackbarMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         vm.consumeSnackbarMessage()
+    }
+
+    deleteConfirmRow?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteConfirmRow = null },
+            title = { Text("Eliminar contacto") },
+            text = {
+                Text("¿Seguro que deseas eliminar a \"${target.displayName}\"?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.deleteContact(target.contactId)
+                        deleteConfirmRow = null
+                    },
+                ) {
+                    Text("Sí")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteConfirmRow = null }) {
+                    Text("No")
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -173,7 +201,11 @@ fun ContactListScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(contactRows, key = { it.contactId }) { row ->
-                    ContactRow(row = row, onClick = { onEditContact(row.contactId) })
+                    ContactRow(
+                        row = row,
+                        onClick = { onEditContact(row.contactId) },
+                        onDeleteRequest = { deleteConfirmRow = row },
+                    )
                 }
             }
             Row(
@@ -200,6 +232,7 @@ fun ContactListScreen(
 private fun ContactRow(
     row: ContactListRowUi,
     onClick: () -> Unit,
+    onDeleteRequest: () -> Unit,
 ) {
     val context = LocalContext.current
     var rowMenuExpanded by remember(row.contactId) { mutableStateOf(false) }
@@ -285,6 +318,13 @@ private fun ContactRow(
                     onClick = {
                         rowMenuExpanded = false
                         openWhatsAppChat(context, row)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Eliminar contacto") },
+                    onClick = {
+                        rowMenuExpanded = false
+                        onDeleteRequest()
                     },
                 )
             }
