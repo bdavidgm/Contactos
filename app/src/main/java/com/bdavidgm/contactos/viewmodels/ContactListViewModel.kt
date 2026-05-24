@@ -90,19 +90,6 @@ class ContactListViewModel(
         }
     }
 
-    fun onImportSampleFromAssets() {
-        viewModelScope.launch {
-            val n = withContext(Dispatchers.IO) {
-                runCatching {
-                    appContext.assets.open("contacts.vcf").use { input ->
-                        repository.importFromVcf(input)
-                    }
-                }.getOrElse { 0 }
-            }
-            _snackbarMessage.value = "Importados: $n contactos"
-        }
-    }
-
     fun onExportMenuClicked() {
         viewModelScope.launch {
             val data = withContext(Dispatchers.IO) { repository.exportAllToVcfString() }

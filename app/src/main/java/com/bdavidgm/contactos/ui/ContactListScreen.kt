@@ -161,13 +161,6 @@ fun ContactListScreen(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Importar ejemplo (contacts.vcf)") },
-                            onClick = {
-                                vm.setMenuOpen(false)
-                                vm.onImportSampleFromAssets()
-                            },
-                        )
-                        DropdownMenuItem(
                             text = { Text("Exportar VCF") },
                             onClick = {
                                 vm.setMenuOpen(false)

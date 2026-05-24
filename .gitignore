@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Evitar subir de nuevo un VCF con datos reales en la raiz del repo
+/contacts.vcf
