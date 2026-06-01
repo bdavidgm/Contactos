@@ -367,6 +367,82 @@ fun ContactEditScreen(
             )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
+                value = ui.url,
+                onValueChange = vm::updateUrl,
+                label = { Text("URL") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text("Redes sociales", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.socialFacebook,
+                onValueChange = vm::updateSocialFacebook,
+                label = { Text("Facebook") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                supportingText = {
+                    Text("URL o nombre de perfil", style = MaterialTheme.typography.bodySmall)
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.socialInstagram,
+                onValueChange = vm::updateSocialInstagram,
+                label = { Text("Instagram") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                supportingText = {
+                    Text("@usuario o enlace", style = MaterialTheme.typography.bodySmall)
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.socialTelegram,
+                onValueChange = vm::updateSocialTelegram,
+                label = { Text("Telegram") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                supportingText = {
+                    Text("@usuario o enlace t.me/…", style = MaterialTheme.typography.bodySmall)
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.socialX,
+                onValueChange = vm::updateSocialX,
+                label = { Text("X (Twitter)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                supportingText = {
+                    Text("@usuario o enlace", style = MaterialTheme.typography.bodySmall)
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.socialDiscord,
+                onValueChange = vm::updateSocialDiscord,
+                label = { Text("Discord") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                supportingText = {
+                    Text("usuario#0000 o enlace de invitación", style = MaterialTheme.typography.bodySmall)
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.socialLinkedIn,
+                onValueChange = vm::updateSocialLinkedIn,
+                label = { Text("LinkedIn") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                supportingText = {
+                    Text("URL o nombre público del perfil", style = MaterialTheme.typography.bodySmall)
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
                 value = ui.birthday,
                 onValueChange = vm::updateBirthday,
                 label = { Text("Cumpleaños") },

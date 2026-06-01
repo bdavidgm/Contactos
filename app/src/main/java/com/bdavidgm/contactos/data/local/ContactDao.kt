@@ -20,6 +20,13 @@ interface ContactDao {
            OR LOWER(mobilePhone) LIKE '%' || LOWER(:query) || '%'
            OR LOWER(landlinePhone) LIKE '%' || LOWER(:query) || '%'
            OR LOWER(email) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(url) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(socialFacebook) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(socialInstagram) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(socialTelegram) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(socialX) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(socialDiscord) LIKE '%' || LOWER(:query) || '%'
+           OR LOWER(socialLinkedIn) LIKE '%' || LOWER(:query) || '%'
         ORDER BY LOWER(lastName), LOWER(firstName)
         """,
     )

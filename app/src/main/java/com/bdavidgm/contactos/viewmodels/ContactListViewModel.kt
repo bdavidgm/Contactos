@@ -50,10 +50,14 @@ class ContactListViewModel(
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
-    private val _openExportDocumentPicker = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val openExportDocumentPicker = _openExportDocumentPicker.asSharedFlow()
+    private val _openExportVcfPicker = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val openExportVcfPicker = _openExportVcfPicker.asSharedFlow()
 
-    private var pendingExportUtf8: String? = null
+    private val _openExportZipPicker = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val openExportZipPicker = _openExportZipPicker.asSharedFlow()
+
+    private var pendingExportVcfUtf8: String? = null
+    private var pendingExportZipBytes: ByteArray? = null
 
     fun onSearchChange(value: String) {
         searchQuery.value = value
@@ -81,26 +85,32 @@ class ContactListViewModel(
         viewModelScope.launch {
             val n = withContext(Dispatchers.IO) {
                 runCatching {
-                    appContext.contentResolver.openInputStream(uri)?.use { input ->
-                        repository.importFromVcf(input)
-                    } ?: 0
+                    repository.importContacts(uri)
                 }.getOrElse { 0 }
             }
             _snackbarMessage.value = "Importados: $n contactos"
         }
     }
 
-    fun onExportMenuClicked() {
+    fun onExportVcfMenuClicked() {
         viewModelScope.launch {
             val data = withContext(Dispatchers.IO) { repository.exportAllToVcfString() }
-            pendingExportUtf8 = data
-            _openExportDocumentPicker.emit(Unit)
+            pendingExportVcfUtf8 = data
+            _openExportVcfPicker.emit(Unit)
         }
     }
 
-    fun onExportDocumentCreated(uri: Uri?) {
-        val data = pendingExportUtf8
-        pendingExportUtf8 = null
+    fun onExportZipMenuClicked() {
+        viewModelScope.launch {
+            val bytes = withContext(Dispatchers.IO) { repository.exportAllToZipBytes() }
+            pendingExportZipBytes = bytes
+            _openExportZipPicker.emit(Unit)
+        }
+    }
+
+    fun onExportVcfDocumentCreated(uri: Uri?) {
+        val data = pendingExportVcfUtf8
+        pendingExportVcfUtf8 = null
         if (uri == null || data == null) return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -110,7 +120,23 @@ class ContactListViewModel(
                     }
                 }
             }
-            _snackbarMessage.value = "Exportación completada"
+            _snackbarMessage.value = "VCF exportado"
+        }
+    }
+
+    fun onExportZipDocumentCreated(uri: Uri?) {
+        val data = pendingExportZipBytes
+        pendingExportZipBytes = null
+        if (uri == null || data == null) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    appContext.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(data)
+                    }
+                }
+            }
+            _snackbarMessage.value = "ZIP exportado (VCF y fotos)"
         }
     }
 }

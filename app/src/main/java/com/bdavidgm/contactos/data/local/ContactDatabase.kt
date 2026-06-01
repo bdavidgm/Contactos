@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ContactEntity::class, CustomFieldEntity::class],
-    version = 3,
+    version = 5,
     exportSchema = false,
 )
 abstract class ContactDatabase : RoomDatabase() {
@@ -32,9 +32,28 @@ abstract class ContactDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE contacts ADD COLUMN url TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE contacts ADD COLUMN socialFacebook TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE contacts ADD COLUMN socialInstagram TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE contacts ADD COLUMN socialTelegram TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE contacts ADD COLUMN socialX TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE contacts ADD COLUMN socialDiscord TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE contacts ADD COLUMN socialLinkedIn TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun build(context: Context): ContactDatabase =
             Room.databaseBuilder(context, ContactDatabase::class.java, "contactos.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }

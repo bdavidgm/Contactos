@@ -19,6 +19,16 @@ data class ContactEntity(
     val landlinePhone: String = "",
     val notes: String = "",
     val email: String = "",
+    /** Sitio web o enlace (texto libre). */
+    val url: String = "",
+    /** Perfil o URL (texto libre). */
+    val socialFacebook: String = "",
+    val socialInstagram: String = "",
+    val socialTelegram: String = "",
+    /** X (antes Twitter): @usuario, URL o texto libre. */
+    val socialX: String = "",
+    val socialDiscord: String = "",
+    val socialLinkedIn: String = "",
     val birthday: String = "",
     val address: String = "",
     /** Ruta en almacenamiento interno de la app (no URI externa). */

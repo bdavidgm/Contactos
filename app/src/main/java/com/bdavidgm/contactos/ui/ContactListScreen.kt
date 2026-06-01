@@ -88,9 +88,14 @@ fun ContactListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var deleteConfirmRow by remember { mutableStateOf<ContactListRowUi?>(null) }
 
-    val exportLauncher = rememberLauncherForActivityResult(
+    val exportVcfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/x-vcard"),
-        onResult = { uri -> vm.onExportDocumentCreated(uri) },
+        onResult = { uri -> vm.onExportVcfDocumentCreated(uri) },
+    )
+
+    val exportZipLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip"),
+        onResult = { uri -> vm.onExportZipDocumentCreated(uri) },
     )
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -99,8 +104,14 @@ fun ContactListScreen(
     )
 
     LaunchedEffect(Unit) {
-        vm.openExportDocumentPicker.collect {
-            exportLauncher.launch("contactos_export.vcf")
+        vm.openExportVcfPicker.collect {
+            exportVcfLauncher.launch("contactos_export.vcf")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        vm.openExportZipPicker.collect {
+            exportZipLauncher.launch("contactos_export.zip")
         }
     }
 
@@ -154,17 +165,32 @@ fun ContactListScreen(
                         onDismissRequest = { vm.setMenuOpen(false) },
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Importar VCF") },
+                            text = { Text("Importar VCF o ZIP") },
                             onClick = {
                                 vm.setMenuOpen(false)
-                                importLauncher.launch(arrayOf("text/*", "text/x-vcard", "text/vcard", "*/*"))
+                                importLauncher.launch(
+                                    arrayOf(
+                                        "text/*",
+                                        "text/x-vcard",
+                                        "text/vcard",
+                                        "application/zip",
+                                        "*/*",
+                                    ),
+                                )
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Exportar VCF") },
                             onClick = {
                                 vm.setMenuOpen(false)
-                                vm.onExportMenuClicked()
+                                vm.onExportVcfMenuClicked()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Exportar ZIP") },
+                            onClick = {
+                                vm.setMenuOpen(false)
+                                vm.onExportZipMenuClicked()
                             },
                         )
                     }

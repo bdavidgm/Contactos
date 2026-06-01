@@ -31,6 +31,13 @@ data class ContactEditUiState(
     val landlinePhone: String = "",
     val notes: String = "",
     val email: String = "",
+    val url: String = "",
+    val socialFacebook: String = "",
+    val socialInstagram: String = "",
+    val socialTelegram: String = "",
+    val socialX: String = "",
+    val socialDiscord: String = "",
+    val socialLinkedIn: String = "",
     val birthday: String = "",
     val address: String = "",
     val existingPhotoPath: String? = null,
@@ -71,6 +78,13 @@ class ContactEditViewModel(
                         landlinePhone = c.landlinePhone,
                         notes = c.notes,
                         email = c.email,
+                        url = c.url,
+                        socialFacebook = c.socialFacebook,
+                        socialInstagram = c.socialInstagram,
+                        socialTelegram = c.socialTelegram,
+                        socialX = c.socialX,
+                        socialDiscord = c.socialDiscord,
+                        socialLinkedIn = c.socialLinkedIn,
                         birthday = c.birthday,
                         address = c.address,
                         existingPhotoPath = path,
@@ -101,6 +115,13 @@ class ContactEditViewModel(
     fun updateLandline(v: String) = _ui.update { it.copy(landlinePhone = v) }
     fun updateNotes(v: String) = _ui.update { it.copy(notes = v) }
     fun updateEmail(v: String) = _ui.update { it.copy(email = v) }
+    fun updateUrl(v: String) = _ui.update { it.copy(url = v) }
+    fun updateSocialFacebook(v: String) = _ui.update { it.copy(socialFacebook = v) }
+    fun updateSocialInstagram(v: String) = _ui.update { it.copy(socialInstagram = v) }
+    fun updateSocialTelegram(v: String) = _ui.update { it.copy(socialTelegram = v) }
+    fun updateSocialX(v: String) = _ui.update { it.copy(socialX = v) }
+    fun updateSocialDiscord(v: String) = _ui.update { it.copy(socialDiscord = v) }
+    fun updateSocialLinkedIn(v: String) = _ui.update { it.copy(socialLinkedIn = v) }
     fun updateBirthday(v: String) = _ui.update { it.copy(birthday = v) }
     fun updateAddress(v: String) = _ui.update { it.copy(address = v) }
 
@@ -152,6 +173,13 @@ class ContactEditViewModel(
                 landlinePhone = s.landlinePhone.trim(),
                 notes = s.notes.trim(),
                 email = s.email.trim(),
+                url = s.url.trim(),
+                socialFacebook = s.socialFacebook.trim(),
+                socialInstagram = s.socialInstagram.trim(),
+                socialTelegram = s.socialTelegram.trim(),
+                socialX = s.socialX.trim(),
+                socialDiscord = s.socialDiscord.trim(),
+                socialLinkedIn = s.socialLinkedIn.trim(),
                 birthday = s.birthday.trim(),
                 address = s.address.trim(),
                 photoPath = s.existingPhotoPath,

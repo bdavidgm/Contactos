@@ -33,13 +33,21 @@ object VcfParser {
         var org: String? = null
         var note: String? = null
         var email: String? = null
+        var url: String? = null
         var bday: String? = null
         val adrParts = mutableListOf<String>()
         var mobile: String? = null
         var landline: String? = null
+        var socialFacebook: String? = null
+        var socialInstagram: String? = null
+        var socialTelegram: String? = null
+        var socialX: String? = null
+        var socialDiscord: String? = null
+        var socialLinkedIn: String? = null
         val custom = mutableListOf<Pair<String, String>>()
         var photoB64: String? = null
         var photoType: String? = null
+        var sidecarPhotoPath: String? = null
 
         for (raw in lines) {
             val (nameUpper, params, value) = splitProperty(raw) ?: continue
@@ -55,6 +63,17 @@ object VcfParser {
                 "ORG" -> org = value.replace("\\;", ";").trim()
                 "NOTE" -> note = (note?.let { "$it\n" } ?: "") + value.replace("\\n", "\n")
                 "EMAIL" -> if (email.isNullOrBlank()) email = value.trim()
+                "URL" -> if (url.isNullOrBlank()) url = value.trim()
+                "X-FACEBOOK" -> if (socialFacebook.isNullOrBlank()) socialFacebook = value.trim()
+                "X-INSTAGRAM" -> if (socialInstagram.isNullOrBlank()) socialInstagram = value.trim()
+                "X-TELEGRAM" -> if (socialTelegram.isNullOrBlank()) socialTelegram = value.trim()
+                "X-TWITTER", "X-X" -> if (socialX.isNullOrBlank()) socialX = value.trim()
+                "X-DISCORD" -> if (socialDiscord.isNullOrBlank()) socialDiscord = value.trim()
+                "X-LINKEDIN" -> if (socialLinkedIn.isNullOrBlank()) socialLinkedIn = value.trim()
+                "X-CONTACTOS-PHOTO" -> {
+                    val p = value.trim().replace('\\', '/').trimStart('/')
+                    if (p.isNotBlank() && sidecarPhotoPath.isNullOrBlank()) sidecarPhotoPath = p
+                }
                 "BDAY" -> if (bday.isNullOrBlank()) bday = value.trim()
                 "ADR" -> adrParts += formatAdr(value)
                 "TEL" -> {
@@ -73,8 +92,30 @@ object VcfParser {
                         ?.uppercase(Locale.US)
                     val type = params.firstOrNull { it.startsWith("TYPE=", true) }
                         ?.substringAfter("=", "")
-                    if (encoding == "B" || encoding == "BASE64") {
-                        photoB64 = value.replace("\n", "").replace("\r", "")
+                    val valueUri = params.any { it.equals("VALUE=URI", true) || it.startsWith("VALUE=URI:", true) }
+                    if (valueUri && value.startsWith("http", ignoreCase = true)) {
+                        // Fotos solo por URL: no descargamos aquí.
+                    } else if (value.startsWith("data:", ignoreCase = true)) {
+                        val comma = value.indexOf(',')
+                        if (comma > 0) {
+                            val meta = value.substring(0, comma).lowercase(Locale.US)
+                            val b64 = value.substring(comma + 1).replace("\n", "").replace("\r", "").trim()
+                            if ("base64" in meta && photoB64.isNullOrBlank()) {
+                                photoB64 = b64
+                                photoType = when {
+                                    "image/png" in meta -> "PNG"
+                                    "image/jpeg" in meta || "image/jpg" in meta -> "JPEG"
+                                    else -> type
+                                }
+                            }
+                        }
+                    } else if (encoding == "B" || encoding == "BASE64") {
+                        if (photoB64.isNullOrBlank()) {
+                            photoB64 = value.replace("\n", "").replace("\r", "")
+                            photoType = type
+                        }
+                    } else if (photoB64.isNullOrBlank() && looksLikeRawBase64Photo(value)) {
+                        photoB64 = value.replace("\n", "").replace("\r", "").trim()
                         photoType = type
                     }
                 }
@@ -98,12 +139,36 @@ object VcfParser {
             landlinePhone = landline.orEmpty(),
             notes = note.orEmpty(),
             email = email.orEmpty(),
+            url = url.orEmpty(),
+            socialFacebook = socialFacebook.orEmpty(),
+            socialInstagram = socialInstagram.orEmpty(),
+            socialTelegram = socialTelegram.orEmpty(),
+            socialX = socialX.orEmpty(),
+            socialDiscord = socialDiscord.orEmpty(),
+            socialLinkedIn = socialLinkedIn.orEmpty(),
             birthday = bday.orEmpty(),
             address = adrParts.joinToString("\n").trim(),
             photoBase64 = photoB64,
             photoType = photoType,
+            sidecarPhotoPath = sidecarPhotoPath,
             customFields = custom,
         )
+    }
+
+    /** Heurística para vCards con PHOTO sin ENCODING explícito pero valor en Base64. */
+    private fun looksLikeRawBase64Photo(value: String): Boolean {
+        val cleaned = value.replace("\n", "").replace("\r", "").trim()
+        if (cleaned.length < 120) return false
+        if (':' in cleaned) return false
+        for (ch in cleaned) {
+            when {
+                ch.isLetterOrDigit() -> {}
+                ch == '+' || ch == '/' || ch == '=' -> {}
+                ch.isWhitespace() -> {}
+                else -> return false
+            }
+        }
+        return true
     }
 
     private fun formatAdr(value: String): String {
