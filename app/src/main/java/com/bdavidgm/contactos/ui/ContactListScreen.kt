@@ -1,13 +1,10 @@
 package com.bdavidgm.contactos.ui
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +20,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -59,7 +58,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.bdavidgm.contactos.ContactosApplication
 import com.bdavidgm.contactos.data.repo.ContactRepository
-import com.bdavidgm.contactos.phone.buildMobileE164Digits
 import com.bdavidgm.contactos.viewmodels.ContactListViewModel
 import com.bdavidgm.contactos.viewmodels.ContactListViewModelFactory
 import java.io.File
@@ -82,11 +80,14 @@ fun ContactListScreen(
 
     val search by vm.search.collectAsStateWithLifecycle()
     val contactRows by vm.contactRows.collectAsStateWithLifecycle()
+    val selectedIds by vm.selectedContactIds.collectAsStateWithLifecycle()
     val menuOpen by vm.menuOpen.collectAsStateWithLifecycle()
     val snackbarMessage by vm.snackbarMessage.collectAsStateWithLifecycle()
+    val pendingDeleteSingle by vm.pendingDeleteSingle.collectAsStateWithLifecycle()
+    val pendingExportSubset by vm.pendingExportSubset.collectAsStateWithLifecycle()
+    val showBulkDeleteDialog by vm.showBulkDeleteDialog.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    var deleteConfirmRow by remember { mutableStateOf<ContactListRowUi?>(null) }
 
     val exportVcfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/x-vcard"),
@@ -121,25 +122,62 @@ fun ContactListScreen(
         vm.consumeSnackbarMessage()
     }
 
-    deleteConfirmRow?.let { target ->
+    pendingDeleteSingle?.let { target ->
         AlertDialog(
-            onDismissRequest = { deleteConfirmRow = null },
+            onDismissRequest = { vm.dismissDeleteSingleDialog() },
             title = { Text("Eliminar contacto") },
             text = {
                 Text("¿Seguro que deseas eliminar a \"${target.displayName}\"?")
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.deleteContact(target.contactId)
-                        deleteConfirmRow = null
-                    },
-                ) {
+                TextButton(onClick = { vm.confirmDeleteSingleDialog() }) {
                     Text("Sí")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deleteConfirmRow = null }) {
+                TextButton(onClick = { vm.dismissDeleteSingleDialog() }) {
+                    Text("No")
+                }
+            },
+        )
+    }
+
+    if (pendingExportSubset != null) {
+        val n = selectedIds.size
+        AlertDialog(
+            onDismissRequest = { vm.dismissPendingExportSubset() },
+            title = { Text("Exportar contactos") },
+            text = {
+                Text("¿Está seguro que quiere exportar los $n contactos seleccionados?")
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmPendingExportSubset() }) {
+                    Text("Sí")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.dismissPendingExportSubset() }) {
+                    Text("No")
+                }
+            },
+        )
+    }
+
+    if (showBulkDeleteDialog) {
+        val n = selectedIds.size
+        AlertDialog(
+            onDismissRequest = { vm.dismissBulkDeleteDialog() },
+            title = { Text("Eliminar contactos") },
+            text = {
+                Text("¿Seguro que deseas eliminar los $n contactos seleccionados?")
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmBulkDeleteDialog() }) {
+                    Text("Sí")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.dismissBulkDeleteDialog() }) {
                     Text("No")
                 }
             },
@@ -149,7 +187,15 @@ fun ContactListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Contactos") },
+                title = {
+                    Text(
+                        if (selectedIds.isNotEmpty()) {
+                            "Contactos (${selectedIds.size})"
+                        } else {
+                            "Contactos"
+                        },
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = TopBarCeleste,
                     scrolledContainerColor = TopBarCeleste,
@@ -157,6 +203,22 @@ fun ContactListScreen(
                     actionIconContentColor = TopBarOnCeleste,
                 ),
                 actions = {
+                    if (selectedIds.isNotEmpty()) {
+                        IconButton(onClick = { vm.showBulkDeleteDialog() }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Eliminar seleccionados",
+                                tint = TopBarOnCeleste,
+                            )
+                        }
+                        IconButton(onClick = { vm.clearSelection() }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Cancelar selección",
+                                tint = TopBarOnCeleste,
+                            )
+                        }
+                    }
                     IconButton(onClick = { vm.setMenuOpen(true) }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones")
                     }
@@ -183,14 +245,14 @@ fun ContactListScreen(
                             text = { Text("Exportar VCF") },
                             onClick = {
                                 vm.setMenuOpen(false)
-                                vm.onExportVcfMenuClicked()
+                                vm.onExportVcfToolbarMenuClicked()
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Exportar ZIP") },
                             onClick = {
                                 vm.setMenuOpen(false)
-                                vm.onExportZipMenuClicked()
+                                vm.onExportZipToolbarMenuClicked()
                             },
                         )
                     }
@@ -222,8 +284,17 @@ fun ContactListScreen(
                 items(contactRows, key = { it.contactId }) { row ->
                     ContactRow(
                         row = row,
-                        onClick = { onEditContact(row.contactId) },
-                        onDeleteRequest = { deleteConfirmRow = row },
+                        isSelected = row.contactId in selectedIds,
+                        onRowClick = {
+                            if (!vm.handleContactRowClick(row.contactId)) {
+                                onEditContact(row.contactId)
+                            }
+                        },
+                        onRowLongPress = { vm.toggleContactSelection(row.contactId) },
+                        onDeleteRequest = { vm.showDeleteSingleDialog(row) },
+                        onSms = { vm.openSmsForContact(row) },
+                        onDial = { vm.openDialForContact(row) },
+                        onWhatsApp = { vm.openWhatsAppForContact(row) },
                     )
                 }
             }
@@ -247,25 +318,41 @@ fun ContactListScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContactRow(
     row: ContactListRowUi,
-    onClick: () -> Unit,
+    isSelected: Boolean,
+    onRowClick: () -> Unit,
+    onRowLongPress: () -> Unit,
     onDeleteRequest: () -> Unit,
+    onSms: () -> Unit,
+    onDial: () -> Unit,
+    onWhatsApp: () -> Unit,
 ) {
-    val context = LocalContext.current
     var rowMenuExpanded by remember(row.contactId) { mutableStateOf(false) }
+    val rowBg = if (isSelected) {
+        TopBarCeleste.copy(alpha = 0.38f)
+    } else {
+        Color.Transparent
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(rowBg)
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             modifier = Modifier
                 .weight(1f)
-                .clickable(onClick = onClick),
+                .combinedClickable(
+                    onClick = onRowClick,
+                    onLongClick = onRowLongPress,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -322,21 +409,21 @@ private fun ContactRow(
                     text = { Text("SMS") },
                     onClick = {
                         rowMenuExpanded = false
-                        openSmsToContact(context, row)
+                        onSms()
                     },
                 )
                 DropdownMenuItem(
                     text = { Text("Llamada") },
                     onClick = {
                         rowMenuExpanded = false
-                        openDialContact(context, row)
+                        onDial()
                     },
                 )
                 DropdownMenuItem(
                     text = { Text("WhatsApp") },
                     onClick = {
                         rowMenuExpanded = false
-                        openWhatsAppChat(context, row)
+                        onWhatsApp()
                     },
                 )
                 DropdownMenuItem(
@@ -348,61 +435,5 @@ private fun ContactRow(
                 )
             }
         }
-    }
-}
-
-private fun primaryPhoneDigits(row: ContactListRowUi): String? {
-    val mobile = buildMobileE164Digits(row.mobileDialCode, row.mobilePhone)
-    if (!mobile.isNullOrBlank()) return mobile
-    val land = buildMobileE164Digits(row.landlineDialCode, row.landlinePhone)
-    if (!land.isNullOrBlank()) return land
-    return null
-}
-
-private fun toastNoNumber(context: Context) {
-    Toast.makeText(context, "Este contacto no tiene número", Toast.LENGTH_SHORT).show()
-}
-
-private fun openSmsToContact(context: Context, row: ContactListRowUi) {
-    val d = primaryPhoneDigits(row) ?: return toastNoNumber(context)
-    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$d"))
-    try {
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        Toast.makeText(context, "No se pudo abrir la app de mensajes", Toast.LENGTH_SHORT).show()
-    }
-}
-
-private fun openDialContact(context: Context, row: ContactListRowUi) {
-    val d = primaryPhoneDigits(row) ?: return toastNoNumber(context)
-    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(d)}"))
-    try {
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        Toast.makeText(context, "No se pudo abrir el marcador", Toast.LENGTH_SHORT).show()
-    }
-}
-
-/**
- * E.164 sin `+` para WhatsApp: móvil o fijo con código de país del contacto.
- */
-private fun digitsForWhatsApp(row: ContactListRowUi): String? {
-    val mobile = buildMobileE164Digits(row.mobileDialCode, row.mobilePhone)
-    if (!mobile.isNullOrBlank()) return mobile
-    return buildMobileE164Digits(row.landlineDialCode, row.landlinePhone)
-}
-
-private fun openWhatsAppChat(context: Context, row: ContactListRowUi) {
-    val phone = digitsForWhatsApp(row) ?: return toastNoNumber(context)
-    if (phone.isBlank()) return toastNoNumber(context)
-    // `?phone=` evita ambigüedades con ceros iniciales en el segmento de ruta de wa.me
-    val uri = Uri.parse("https://api.whatsapp.com/send").buildUpon()
-        .appendQueryParameter("phone", phone)
-        .build()
-    val intent = Intent(Intent.ACTION_VIEW, uri)
-    try {
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        Toast.makeText(context, "No se pudo abrir WhatsApp", Toast.LENGTH_SHORT).show()
     }
 }

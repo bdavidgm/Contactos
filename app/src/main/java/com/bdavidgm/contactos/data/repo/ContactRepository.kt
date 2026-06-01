@@ -149,6 +149,18 @@ class ContactRepository(
         VcfExporter.exportContacts(all, map, VcfPhotoExportStrategy.InlineBase64()).vcfText
     }
 
+    /** Exporta solo los contactos cuyos ids aparecen en [contactIds] (orden conservado). */
+    suspend fun exportContactsToVcfString(contactIds: List<Long>): String = withContext(Dispatchers.IO) {
+        if (contactIds.isEmpty()) return@withContext ""
+        val all = dao.getAllContacts().associateBy { it.id }
+        val ordered = contactIds.mapNotNull { all[it] }
+        if (ordered.isEmpty()) return@withContext ""
+        val map = ordered.associate { c ->
+            c.id to dao.getCustomFields(c.id).map { it.label to it.value }
+        }
+        VcfExporter.exportContacts(ordered, map, VcfPhotoExportStrategy.InlineBase64()).vcfText
+    }
+
     /** ZIP con `contactos.vcf` y archivos referenciados por `X-CONTACTOS-PHOTO` (carpeta `photos/`). */
     suspend fun exportAllToZipBytes(): ByteArray = withContext(Dispatchers.IO) {
         val all = dao.getAllContacts()
@@ -168,6 +180,46 @@ class ContactRepository(
                 }
             }
             baos.toByteArray()
+        }
+    }
+
+    suspend fun exportContactsToZipBytes(contactIds: List<Long>): ByteArray = withContext(Dispatchers.IO) {
+        if (contactIds.isEmpty()) return@withContext ByteArray(0)
+        val all = dao.getAllContacts().associateBy { it.id }
+        val ordered = contactIds.mapNotNull { all[it] }
+        if (ordered.isEmpty()) return@withContext ByteArray(0)
+        val map = ordered.associate { c ->
+            c.id to dao.getCustomFields(c.id).map { it.label to it.value }
+        }
+        val result = VcfExporter.exportContacts(ordered, map, VcfPhotoExportStrategy.SidecarForZip)
+        ByteArrayOutputStream().use { baos ->
+            ZipOutputStream(baos).use { zos ->
+                zos.putNextEntry(ZipEntry("contactos.vcf"))
+                zos.write(result.vcfText.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+                for ((path, bytes) in result.sidecarPhotos) {
+                    zos.putNextEntry(ZipEntry(path))
+                    zos.write(bytes)
+                    zos.closeEntry()
+                }
+            }
+            baos.toByteArray()
+        }
+    }
+
+    /** Ids en el orden global de la agenda (apellido, nombre), solo los que están en [ids]. */
+    suspend fun getOrderedContactIdsForExport(ids: Collection<Long>): List<Long> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+        val idSet = ids.toSet()
+        dao.getAllContacts().mapNotNull { c -> c.id.takeIf { it in idSet } }
+    }
+
+    suspend fun deleteContacts(ids: Collection<Long>) {
+        withContext(Dispatchers.IO) {
+            for (id in ids) {
+                dao.getContact(id)?.photoPath?.let { File(it).delete() }
+                dao.deleteContact(id)
+            }
         }
     }
 
