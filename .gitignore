@@ -16,3 +16,6 @@ local.properties
 
 # Evitar subir de nuevo un VCF con datos reales en la raiz del repo
 /contacts.vcf
+/contacts2.vcf
+/contacts3.vcf
+

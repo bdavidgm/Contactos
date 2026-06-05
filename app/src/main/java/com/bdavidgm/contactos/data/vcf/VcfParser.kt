@@ -1,13 +1,15 @@
 package com.bdavidgm.contactos.data.vcf
 
 import android.util.Base64
+import java.io.ByteArrayOutputStream
+import java.nio.charset.Charset
 import java.util.Locale
 
 object VcfParser {
 
     fun parse(content: String): List<VcfContact> {
-        val unfolded = unfold(content)
-        val blocks = unfolded.split(Regex("(?i)BEGIN:VCARD")).mapNotNull { block ->
+        val normalized = content.replace("\r\n", "\n")
+        val blocks = normalized.split(Regex("(?i)BEGIN:VCARD")).mapNotNull { block ->
             val trimmed = block.trim()
             if (trimmed.isEmpty()) return@mapNotNull null
             val endIdx = trimmed.indexOf("END:VCARD", ignoreCase = true)
@@ -17,13 +19,60 @@ object VcfParser {
         return blocks.mapNotNull { parseCard(it) }
     }
 
-    private fun unfold(text: String): String {
-        return text.replace("\r\n", "\n")
-            .replace(Regex("\n[ \t]"), "")
+    /** Plegado vCard (línea de continuación que empieza por espacio o tab). Debe aplicarse tras unir soft breaks QP. */
+    private fun unfoldVCardFoldedLines(lines: List<String>): List<String> {
+        val out = mutableListOf<StringBuilder>()
+        for (line in lines) {
+            if (line.isEmpty()) continue
+            if (out.isNotEmpty() && (line[0] == ' ' || line[0] == '\t')) {
+                out.last().append(line, 1, line.length)
+            } else {
+                out.add(StringBuilder(line))
+            }
+        }
+        return out.map { it.toString() }
+    }
+
+    /**
+     * Une líneas físicas cuando vCard 2.1 usa quoted-printable con soft break (`=` al final de línea).
+     * Evita mezclar con [PHOTO;ENCODING=BASE64] (no lleva QUOTED-PRINTABLE).
+     */
+    internal fun mergeQuotedPrintableSoftBreakLines(lines: List<String>): List<String> {
+        val normalized = lines.map { it.trimEnd('\r') }
+        val out = mutableListOf<String>()
+        var i = 0
+        while (i < normalized.size) {
+            var line = normalized[i]
+            if (line.isBlank()) {
+                i++
+                continue
+            }
+            i++
+            val colon = line.indexOf(':')
+            val left = if (colon >= 0) line.substring(0, colon) else ""
+            val isQp = isQuotedPrintableProperty(left)
+            while (isQp && line.endsWith('=') && i < normalized.size) {
+                var next = normalized[i]
+                i++
+                if (next.isBlank()) continue
+                next = next.trimStart(' ', '\t')
+                line = line.dropLast(1) + next
+            }
+            out.add(line)
+        }
+        return out
+    }
+
+    private fun isQuotedPrintableProperty(propertyLeft: String): Boolean {
+        val u = propertyLeft.uppercase(Locale.US)
+        return u.contains("ENCODING=QUOTED-PRINTABLE") ||
+            Regex("ENCODING=QP\\b", RegexOption.IGNORE_CASE).containsMatchIn(propertyLeft)
     }
 
     private fun parseCard(block: String): VcfContact? {
-        val lines = block.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+        val physical = block.lines().map { it.trimEnd('\r') }.filter { it.isNotBlank() }
+        val qpMerged = mergeQuotedPrintableSoftBreakLines(physical)
+        val lines = unfoldVCardFoldedLines(qpMerged).map { it.trimEnd() }.filter { it.isNotBlank() }
         if (lines.isEmpty()) return null
 
         var fn: String? = null
@@ -203,13 +252,101 @@ object VcfParser {
         val left = line.substring(0, idx)
         val value = line.substring(idx + 1)
         val namePart = left.substringBefore(';', left)
-        val nameUpper = namePart.uppercase(Locale.US)
+        // Android / vCard 3: propiedades agrupadas "item1.N" → "N"
+        val nameUpper = canonicalPropertyName(namePart)
         val params = if (left.contains(';')) {
             left.substringAfter(';').split(';').map { it.trim() }
         } else {
             emptyList()
         }
-        return Triple(nameUpper, params, unescape(value))
+        val decodedValue = decodePropertyValue(nameUpper, params, value)
+        return Triple(nameUpper, params, unescape(decodedValue))
+    }
+
+    /** Nombre de propiedad sin prefijo de grupo (p. ej. `item1.N` → `N`). */
+    private fun canonicalPropertyName(namePart: String): String =
+        namePart.trim().uppercase(Locale.US).substringAfterLast('.')
+
+    private fun charsetParam(params: List<String>): String? =
+        params.firstOrNull { it.startsWith("CHARSET=", true) }
+            ?.substringAfter("=", "")
+            ?.trim()
+            ?.trim('"')
+            ?.takeIf { it.isNotBlank() }
+
+    /**
+     * Decodifica quoted-printable cuando viene declarado, o por heurística (=XX hex típico de Android)
+     * en campos de texto como N/FN si falta ENCODING=QUOTED-PRINTABLE.
+     */
+    private fun decodePropertyValue(nameUpper: String, params: List<String>, value: String): String {
+        val charsetName = charsetParam(params)
+        return when {
+            isQuotedPrintableParams(params) -> decodeQuotedPrintable(value, charsetName)
+            nameUpper in QpHeuristicPropertyNames && valueLooksLikeQuotedPrintable(value) ->
+                decodeQuotedPrintable(value, charsetName)
+            else -> value
+        }
+    }
+
+    private val QpHeuristicPropertyNames = setOf(
+        "N", "FN", "ORG", "TITLE", "NOTE", "ADR", "EMAIL", "URL", "LABEL", "BDAY",
+    )
+
+    private fun isQuotedPrintableParams(params: List<String>): Boolean =
+        params.any { p ->
+            if (!p.startsWith("ENCODING=", true)) return@any false
+            when (p.substringAfter("=", "").trim().uppercase(Locale.US)) {
+                "QUOTED-PRINTABLE", "QP" -> true
+                else -> false
+            }
+        }
+
+    /**
+     * Decodifica el cuerpo quoted-printable (RFC 2045) a texto usando [charsetName] o UTF-8.
+     * Los soft line breaks deben haberse unido antes en [mergeQuotedPrintableSoftBreakLines].
+     */
+    internal fun decodeQuotedPrintable(encoded: String, charsetName: String?): String {
+        val charset = charsetFromVcard(charsetName)
+        val out = ByteArrayOutputStream(encoded.length)
+        var i = 0
+        while (i < encoded.length) {
+            val c = encoded[i]
+            if (c == '=' && i + 2 < encoded.length) {
+                val hi = Character.digit(encoded[i + 1], 16)
+                val lo = Character.digit(encoded[i + 2], 16)
+                if (hi >= 0 && lo >= 0) {
+                    out.write((hi shl 4) or lo)
+                    i += 3
+                    continue
+                }
+            }
+            if (c == '\r' || c == '\n') {
+                i++
+                continue
+            }
+            when {
+                c.code < 128 -> out.write(c.code)
+                else -> out.write(encoded.substring(i, i + 1).toByteArray(charset))
+            }
+            i++
+        }
+        return String(out.toByteArray(), charset)
+    }
+
+    private fun charsetFromVcard(charsetName: String?): Charset {
+        val cleaned = charsetName?.trim()?.trim('"')?.takeIf { it.isNotBlank() } ?: return Charsets.UTF_8
+        return try {
+            Charset.forName(cleaned)
+        } catch (_: Throwable) {
+            Charsets.UTF_8
+        }
+    }
+
+    /** True si el valor parece cuerpo quoted-printable (=hexhex…), p. ej. export Android sin ENCODING explícito. */
+    private fun valueLooksLikeQuotedPrintable(value: String): Boolean {
+        val s = value.trim()
+        if (s.length < 6 || !s.startsWith('=')) return false
+        return Regex("=(?:[0-9A-Fa-f]{2})").findAll(s).count() >= 2
     }
 
     private fun unescape(v: String): String =
