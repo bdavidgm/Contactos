@@ -1,5 +1,6 @@
 package com.bdavidgm.contactos.ui
 
+import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,7 +54,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -74,6 +79,8 @@ fun ContactListScreen(
     onEditContact: (Long) -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as ContactosApplication
+    val configuration = LocalConfiguration.current
+    val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     val vm: ContactListViewModel = viewModel(
         factory = ContactListViewModelFactory(app, repository),
     )
@@ -188,12 +195,23 @@ fun ContactListScreen(
         topBar = {
             TopAppBar(
                 title = {
+                    val selectionMode = selectedIds.isNotEmpty()
+                    val titleText = when {
+                        !selectionMode -> "Contactos"
+                        isPortrait -> "Con... (${selectedIds.size})"
+                        else -> "Contactos (${selectedIds.size})"
+                    }
+                    val titleStyle = when {
+                        !selectionMode -> MaterialTheme.typography.titleLarge
+                        selectionMode && isPortrait -> MaterialTheme.typography.titleSmall
+                        else -> MaterialTheme.typography.titleMedium
+                    }
                     Text(
-                        if (selectedIds.isNotEmpty()) {
-                            "Contactos (${selectedIds.size})"
-                        } else {
-                            "Contactos"
-                        },
+                        text = titleText,
+                        style = titleStyle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = TopBarOnCeleste,
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -203,12 +221,32 @@ fun ContactListScreen(
                     actionIconContentColor = TopBarOnCeleste,
                 ),
                 actions = {
-                    if (selectedIds.isNotEmpty()) {
+                    val selectionMode = selectedIds.isNotEmpty()
+                    val compactBar = selectionMode && isPortrait
+                    val actionIconSize = if (compactBar) 22.dp else 24.dp
+                    if (selectionMode) {
+                        IconButton(onClick = { vm.selectAllVisibleContacts() }) {
+                            Icon(
+                                Icons.Filled.SelectAll,
+                                contentDescription = "Seleccionar todos",
+                                tint = TopBarOnCeleste,
+                                modifier = Modifier.size(actionIconSize),
+                            )
+                        }
+                        IconButton(onClick = { vm.invertSelectionOnVisibleContacts() }) {
+                            Icon(
+                                Icons.Filled.SwapHoriz,
+                                contentDescription = "Invertir selección",
+                                tint = TopBarOnCeleste,
+                                modifier = Modifier.size(actionIconSize),
+                            )
+                        }
                         IconButton(onClick = { vm.showBulkDeleteDialog() }) {
                             Icon(
                                 Icons.Filled.Delete,
                                 contentDescription = "Eliminar seleccionados",
                                 tint = TopBarOnCeleste,
+                                modifier = Modifier.size(actionIconSize),
                             )
                         }
                         IconButton(onClick = { vm.clearSelection() }) {
@@ -216,11 +254,17 @@ fun ContactListScreen(
                                 Icons.Filled.Close,
                                 contentDescription = "Cancelar selección",
                                 tint = TopBarOnCeleste,
+                                modifier = Modifier.size(actionIconSize),
                             )
                         }
                     }
                     IconButton(onClick = { vm.setMenuOpen(true) }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones")
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = "Más opciones",
+                            tint = TopBarOnCeleste,
+                            modifier = Modifier.size(if (selectionMode && isPortrait) 22.dp else 24.dp),
+                        )
                     }
                     DropdownMenu(
                         expanded = menuOpen,

@@ -99,6 +99,23 @@ class ContactListViewModel(
         _selectedContactIds.value = emptySet()
     }
 
+    /** Selecciona todos los contactos visibles (lista filtrada por búsqueda actual). */
+    fun selectAllVisibleContacts() {
+        _selectedContactIds.value = contacts.value.map { it.id }.toSet()
+    }
+
+    /** Invierte la selección sobre los contactos visibles; otros ids seleccionados se conservan. */
+    fun invertSelectionOnVisibleContacts() {
+        val visible = contacts.value.map { it.id }.toSet()
+        _selectedContactIds.update { cur ->
+            val next = cur.toMutableSet()
+            for (id in visible) {
+                if (id in next) next.remove(id) else next.add(id)
+            }
+            next
+        }
+    }
+
     /** `true` si la pulsación se gestionó como selección; si `false`, la UI debe abrir edición. */
     fun handleContactRowClick(contactId: Long): Boolean {
         if (_selectedContactIds.value.isEmpty()) return false
